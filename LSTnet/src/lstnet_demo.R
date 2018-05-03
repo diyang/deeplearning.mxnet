@@ -1,6 +1,23 @@
+# Author: Di YANG
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 require(mxnet)
-setwd("~/Documents/LSTnet/")
-#setwd("P:/Groups/Section/ID_S ADVANCED ANALYTICS/Di/Deep Learning/LSTM_AD/")
 source("./lstnet_train.R")
 
 data.preparation <- function(data, 
@@ -74,7 +91,7 @@ data.preparation <- function(data,
 
 seq.len <- 24*7
 horizon <- 3
-max.records <- 24*7*10
+max.records <- NULL
 splits <- c(0.6,0.2)
 batch.size<-128
 seasonal.period <- 24
@@ -83,12 +100,12 @@ filter.list <- c(6, 12, 18)
 num.filter <- 100
 dropout <-0.2
 num.rnn.layer <- 1
-learning.rate <- 0.1
+learning.rate <- 0.01
 wd <- 0.00001
 clip_gradient<-TRUE
 optimiser <- 'sgd'
 
-data <- read.csv('./data/electricity.txt', header=FALSE, sep=",")
+data <- read.csv('../data/electricity.txt', header=FALSE, sep=",")
 
 iter.data <- data.preparation(data, 
                               seq.len = seq.len, 
