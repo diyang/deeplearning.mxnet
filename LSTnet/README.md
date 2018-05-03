@@ -6,9 +6,10 @@
 
 ## Running the code
 Download & extract the training data:
-    - `$ mkdir data && cd data`
-    - `$ wget https://github.com/laiguokun/multivariate-time-series-data/raw/master/electricity/electricity.txt.gz`
-    - `$ gunzip electricity.txt.gz`
+
+- `$ mkdir data && cd data`
+- `$ wget https://github.com/laiguokun/multivariate-time-series-data/raw/master/electricity/electricity.txt.gz`
+- `$ gunzip electricity.txt.gz`
 
 ## Results & Comparison
 
