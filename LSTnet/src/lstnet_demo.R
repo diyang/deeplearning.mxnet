@@ -18,6 +18,7 @@
 # under the License.
 
 require(mxnet)
+setwd('~/Documents/deeplearning.mxnet/LSTnet/src/')
 source("./lstnet_train.R")
 
 data.preparation <- function(data, 
@@ -101,8 +102,8 @@ num.filter <- 100
 dropout <-0.2
 num.rnn.layer <- 1
 learning.rate <- 0.01
-wd <- 0.00001
-clip_gradient<-TRUE
+wd <- 0.0
+clip_gradient<-FALSE
 optimiser <- 'sgd'
 
 data <- read.csv('../data/electricity.txt', header=FALSE, sep=",")
@@ -123,7 +124,7 @@ lstnet.sym <- mx.lstnet(data = iter.data,
                         time.interval = time.interval,
                         filter.list = filter.list,
                         num.filter = num.filter,
-                        num.epoch = 10,
+                        num.epoch = 100,
                         learning.rate = learning.rate,
                         wd=wd,
                         clip_graident = clip_graident,
