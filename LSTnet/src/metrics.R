@@ -94,6 +94,9 @@ evaluate <- function(pred, label)
   pred <- mx.nd.array(pred)
   label <- mx.nd.array(label)
   
+  pred <- mx.nd.transpose(pred, axes=c(0,1))
+  label <- mx.nd.transpose(label, axes=c(0,1))
+  
   eva.all <-list()
   eva.all[['RAE']]  <- rae(label = label, pred = pred)
   eva.all[['RSE']]  <- rse(label = label, pred = pred)

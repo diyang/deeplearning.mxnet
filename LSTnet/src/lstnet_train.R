@@ -246,6 +246,7 @@ mx.lstnet <- function(#input data:
                       num.epoch,
                       learning.rate = 0.1,
                       wd,
+                      init.update = FALSE,
                       clip_graident = TRUE,
                       optimizer='sgd'
                       )
@@ -259,6 +260,8 @@ mx.lstnet <- function(#input data:
                               seq.len = seq.len,
                               input.size = input.size,
                               batch.size = batch.size,
+                              num.rnn.layer = num.rnn.layer,
+                              init.update = init.update,
                               dropout = dropout)
   
   init.lstm.states.c <- lapply(1:num.rnn.layer, function(i) {
@@ -294,6 +297,7 @@ mx.lstnet <- function(#input data:
                         learning.rate = learning.rate,
                         wd = wd,
                         clip_gradient = clip_gradient,
+                        init.update = init.update,
                         optimiser = optimiser)
   
   # change model into MXFeedForwardModel
