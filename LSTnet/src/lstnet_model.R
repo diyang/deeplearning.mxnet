@@ -326,7 +326,7 @@ mx.rnn.lstnet <- function(seasonal.period,
   ##################
   # Autoregression #
   ##################
-  time.series.slice = mx.symbol.SliceChannel(data=data, num_outputs=input.size, axis= 1, squeeze_axis=1)
+  time.series.slice <- mx.symbol.SliceChannel(data=data, num_outputs=input.size, axis= 1, squeeze_axis=1)
   auto.list <- list()
   for(i in 1:input.size){
     time.series <- time.series.slice[[i]]
@@ -334,7 +334,6 @@ mx.rnn.lstnet <- function(seasonal.period,
     auto.list <- c(auto.list, fc.ts)
   }
   ar.output <- mx.symbol.Concat(data=auto.list, num.args = input.size, dim=1)
-  
   
   ##################
   # Prediction Out #  
@@ -344,8 +343,8 @@ mx.rnn.lstnet <- function(seasonal.period,
   model.output <- neural.output + ar.output
   loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
   
+  #include last states of GRU and LSTM for updating
   if(init.update){
-    #include last states of GRU and LSTM for updating
     gru.last.states  <- output.gru.bulk$last.states
     lstm.last.states <- output.lstm.bulk$last.states
     
