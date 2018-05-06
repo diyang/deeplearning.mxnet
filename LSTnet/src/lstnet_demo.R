@@ -101,11 +101,11 @@ time.interval <- 1
 filter.list <- c(6, 12, 18)
 num.filter <- 100
 dropout <-0.2
-num.rnn.layer <- 20
+num.rnn.layer <- 1
 learning.rate <- 0.01
 wd <- 0.0
 clip_gradient<-FALSE
-init.update <- TRUE
+init.update <- FALSE
 optimiser <- 'sgd'
 
 data <- read.csv('../data/electricity.txt', header=FALSE, sep=",")
@@ -133,4 +133,5 @@ lstnet.sym <- mx.lstnet(data = iter.data,
                         optimizer = optimiser,
                         dropout = dropout,
                         init.update = init.update,
-                        num.rnn.layer = num.rnn.layer)
+                        num.rnn.layer = num.rnn.layer,
+                        type='attn')

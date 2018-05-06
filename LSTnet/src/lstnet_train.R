@@ -55,10 +55,13 @@ train.lstnet <- function(model,
                          wd,
                          clip_gradient = TRUE,
                          init.update = FALSE,
-                         optimiser = 'sgd')
+                         optimiser = 'sgd',
+                         type = 'skip')
 {
   train.batch.shape <- dim(train.data$data)
   valid.batch.shape <- dim(valid.data$data)
+  # clear screen for logs
+  cat('\014')
   cat(paste0("Training with train.shape=(", paste0(train.batch.shape, collapse=","), ")"), "\n")
   cat(paste0("Validating with valid.shape=(", paste0(valid.batch.shape, collapse=","), ")"), "\n")
   
@@ -83,10 +86,16 @@ train.lstnet <- function(model,
     
     #initialise first hidden states of GRU and LSTM, and c state of LSTM
     init.states <- list()
-    for(i in 1:num.rnn.layer){
-      init.states[[paste0("l", i, ".gru.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
-      init.states[[paste0("l", i, ".lstm.init.c")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
-      init.states[[paste0("l", i, ".lstm.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+    if(type == 'skip'){
+      for(i in 1:num.rnn.layer){
+        init.states[[paste0("l", i, ".gru.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+        init.states[[paste0("l", i, ".lstm.init.c")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+        init.states[[paste0("l", i, ".lstm.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+      }
+    }else{
+      for(i in 1:num.rnn.layer){
+        init.states[[paste0("l", i, ".gru.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+      }
     }
     mx.exec.update.arg.arrays(m$lstnet.exec, init.states, match.name = TRUE)
     
@@ -115,10 +124,16 @@ train.lstnet <- function(model,
       #update GRU and LSTM states
       if(init.update){
         init.states <- list()
-        for (i in 1:num.rnn.layer) {
-          init.states[[paste0("l", i, ".gru.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".gru.last.c_output")]]
-          init.states[[paste0("l", i, ".lstm.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.c_output")]]
-          init.states[[paste0("l", i, ".lstm.init.h")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.h_output")]]
+        if(type == 'skip'){
+          for (i in 1:num.rnn.layer) {
+            init.states[[paste0("l", i, ".gru.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".gru.last.c_output")]]
+            init.states[[paste0("l", i, ".lstm.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.c_output")]]
+            init.states[[paste0("l", i, ".lstm.init.h")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.h_output")]]
+          }
+        }else{
+          for (i in 1:num.rnn.layer) {
+            init.states[[paste0("l", i, ".gru.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".gru.last.c_output")]]
+          }
         }
         mx.exec.update.arg.arrays(m$lstnet.exec, init.states, match.name=TRUE)
       }
@@ -134,10 +149,16 @@ train.lstnet <- function(model,
     # batch validating #
     ####################
     init.states <- list()
-    for(i in 1:num.rnn.layer){
-      init.states[[paste0("l", i, ".gru.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
-      init.states[[paste0("l", i, ".lstm.init.c")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
-      init.states[[paste0("l", i, ".lstm.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+    if(type == 'skip'){
+      for(i in 1:num.rnn.layer){
+        init.states[[paste0("l", i, ".gru.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+        init.states[[paste0("l", i, ".lstm.init.c")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+        init.states[[paste0("l", i, ".lstm.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+      }
+    }else{
+      for(i in 1:num.rnn.layer){
+        init.states[[paste0("l", i, ".gru.init.h")]] <- mx.nd.zeros(c(num.filter*length(filter.list), batch.size))
+      }
     }
     mx.exec.update.arg.arrays(m$lstnet.exec, init.states, match.name = TRUE)
 
@@ -157,11 +178,18 @@ train.lstnet <- function(model,
       #update GRU and LSTM states 
       if(init.update){
         init.states <- list()
-        for (i in 1:num.rnn.layer) {
-          init.states[[paste0("l", i, ".gru.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".gru.last.c_output")]]
-          init.states[[paste0("l", i, ".lstm.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.c_output")]]
-          init.states[[paste0("l", i, ".lstm.init.h")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.h_output")]]
+        if(type == 'skip'){
+          for (i in 1:num.rnn.layer) {
+            init.states[[paste0("l", i, ".gru.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".gru.last.c_output")]]
+            init.states[[paste0("l", i, ".lstm.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.c_output")]]
+            init.states[[paste0("l", i, ".lstm.init.h")]] <- m$rnn.exec$outputs[[paste0("l", i, ".lstm.last.h_output")]]
+          }
+        }else{
+          for (i in 1:num.rnn.layer) {
+            init.states[[paste0("l", i, ".gru.init.c")]] <- m$rnn.exec$outputs[[paste0("l", i, ".gru.last.c_output")]]
+          }
         }
+        
         mx.exec.update.arg.arrays(m$lstnet.exec, init.states, match.name=TRUE)
       }
     }
@@ -248,35 +276,53 @@ mx.lstnet <- function(#input data:
                       wd,
                       init.update = FALSE,
                       clip_graident = TRUE,
-                      optimizer='sgd'
+                      optimizer='sgd',
+                      type = 'skip'
                       )
 {
   input.size <- dim(data$train$data)[2]
-  
-  lstnet.sym <- mx.rnn.lstnet(seasonal.period = seasonal.period,
-                              time.interval = time.interval,
-                              filter.list = filter.list,
-                              num.filter = num.filter,
-                              seq.len = seq.len,
-                              input.size = input.size,
-                              batch.size = batch.size,
-                              num.rnn.layer = num.rnn.layer,
-                              init.update = init.update,
-                              dropout = dropout)
-  
-  init.lstm.states.c <- lapply(1:num.rnn.layer, function(i) {
-    state.c <- paste0("l", i, ".lstm.init.c")
-    return (state.c)
-  })
-  init.lstm.states.h <- lapply(1:num.rnn.layer, function(i) {
-    state.h <- paste0("l", i, ".lstm.init.h")
-    return (state.h)
-  })
-  init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
-    state.h <- paste0("l", i, ".gru.init.h")
-    return (state.h)
-  })
-  init.states.name <- c(init.lstm.states.c, init.lstm.states.h, init.gru.states.h)
+  if(type == 'skip'){
+    lstnet.sym <- mx.rnn.lstnet.skip(seasonal.period = seasonal.period,
+                                     time.interval = time.interval,
+                                     filter.list = filter.list,
+                                     num.filter = num.filter,
+                                     seq.len = seq.len,
+                                     input.size = input.size,
+                                     batch.size = batch.size,
+                                     num.rnn.layer = num.rnn.layer,
+                                     init.update = init.update,
+                                     dropout = dropout)
+    
+    init.lstm.states.c <- lapply(1:num.rnn.layer, function(i) {
+      state.c <- paste0("l", i, ".lstm.init.c")
+      return (state.c)
+    })
+    init.lstm.states.h <- lapply(1:num.rnn.layer, function(i) {
+      state.h <- paste0("l", i, ".lstm.init.h")
+      return (state.h)
+    })
+    init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
+      state.h <- paste0("l", i, ".gru.init.h")
+      return (state.h)
+    })
+    init.states.name <- c(init.lstm.states.c, init.lstm.states.h, init.gru.states.h)
+    
+  }else{
+    lstnet.sym <- mx.rnn.lstnet.attn(filter.list = filter.list,
+                                     num.filter = num.filter,
+                                     seq.len = seq.len,
+                                     input.size = input.size,
+                                     batch.size = batch.size,
+                                     num.rnn.layer = num.rnn.layer,
+                                     init.update = init.update,
+                                     dropout = dropout)
+    
+    init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
+      state.h <- paste0("l", i, ".gru.init.h")
+      return (state.h)
+    })
+    init.states.name <- c(init.gru.states.h)
+  }
   
   model <- lstnet.setup.model(lstnet.sym = lstnet.sym,
                               ctx = ctx,
@@ -290,6 +336,7 @@ mx.lstnet <- function(#input data:
                               initializer = initializer,
                               dropout = dropout)
   
+  if(FALSE){
   model <- train.lstnet(model,
                         train.data = data$train,
                         valid.data = data$valid,
@@ -302,6 +349,56 @@ mx.lstnet <- function(#input data:
   
   # change model into MXFeedForwardModel
   model <- list(symbol=model$symbol, arg.params=model$lstnet.exec$ref.arg.arrays, aux.params=model$lstnet.exec$ref.aux.arrays)
+  }
   return(structure(model, class="MXFeedForwardModel"))
-  
 }
+
+
+
+seq.len <- 24*7
+batch.size <- 128
+num.rnn.layer <- 1
+num.filter <- 100
+filter.list <- c(6, 12, 18)
+input.size <- 321
+dropout <- 0
+init.update <- FALSE
+lstnet.sym <- mx.rnn.lstnet.attn(filter.list = filter.list,
+                                 num.filter = num.filter,
+                                 seq.len = seq.len,
+                                 input.size = input.size,
+                                 batch.size = batch.size,
+                                 num.rnn.layer = num.rnn.layer,
+                                 init.update = init.update,
+                                 dropout = dropout)
+
+init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
+  state.h <- paste0("l", i, ".gru.init.h")
+  return (state.h)
+})
+init.states.name <- c(init.gru.states.h)
+
+ctx <- mx.ctx.default() 
+initializer<-mx.init.uniform(0.01)
+
+arg.names <- lstnet.sym$arguments
+input.shape <- list()
+for (name in arg.names) {
+  if (name %in% init.states.name) {
+    input.shape[[name]] <- c(num.filter*length(filter.list), batch.size)
+  }
+  if (grepl('data$', name) ) {
+    input.shape[[name]] <- c(seq.len, input.size, batch.size)
+  }
+  else if (grepl('label$', name) ){
+    input.shape[[name]] <- c(input.size, batch.size)
+  }
+}
+
+params <- mx.model.init.params(symbol = lstnet.sym, input.shape = input.shape, initializer = initializer, ctx = ctx)
+
+args <- input.shape
+args$symbol <- lstnet.sym
+args$ctx <- ctx
+args$grad.req <- 'add'
+lstnet.exec <- do.call(mx.simple.bind, args)

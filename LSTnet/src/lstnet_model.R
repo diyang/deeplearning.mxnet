@@ -272,16 +272,16 @@ rnn.unroll <- function(data,
   return(list.all)
 }
 
-mx.rnn.lstnet <- function(seasonal.period,
-                          time.interval,
-                          filter.list,
-                          num.filter,
-                          seq.len,
-                          input.size,
-                          batch.size,
-                          num.rnn.layer = 1,
-                          init.update = FALSE,
-                          dropout = 0)
+mx.rnn.lstnet.skip <- function(seasonal.period,
+                               time.interval,
+                               filter.list,
+                               num.filter,
+                               seq.len,
+                               input.size,
+                               batch.size,
+                               num.rnn.layer = 1,
+                               init.update = FALSE,
+                               dropout = 0)
 {
   data <- mx.symbol.Variable('data')
   label<- mx.symbol.Variable('label')
@@ -367,6 +367,113 @@ mx.rnn.lstnet <- function(seasonal.period,
     
     #include everything
     list.all <- c(loss.grad, gru.unpack.h, lstm.unpack.c, lstm.unpack.h)
+    return(mx.symbol.Group(list.all))
+  }else{
+    return(loss.grad)
+  }
+}
+
+mx.rnn.lstnet.attn <- function(filter.list,
+                               num.filter,
+                               seq.len,
+                               input.size,
+                               batch.size,
+                               num.rnn.layer = 1,
+                               init.update = FALSE,
+                               dropout = 0)
+{
+  data <- mx.symbol.Variable('data')
+  label<- mx.symbol.Variable('label')
+  
+  #reshape data before applying convolutional layer
+  conv_input <- mx.symbol.Reshape(data=data, shape=c(seq.len, input.size, 1, batch.size))
+  
+  #################
+  # CNN component #
+  #################
+  output <- list()
+  for(i in 1:length(filter.list)){
+    padi <- mx.symbol.pad(data=conv_input, mode='constant', constant_value=0, pad_width=c(0,(filter.list[[i]]-1), 0,0, 0,0, 0,0))
+    convi<- mx.symbol.Convolution(data=padi, kernel=c(filter.list[[i]], input.size), num_filter = num.filter)
+    acti <- mx.symbol.Activation(data=convi, act_type='relu')
+    trans<- mx.symbol.Reshape(mx.symbol.transpose(data=acti, axes=c(0,2,3,1)), shape=c(seq.len, num.filter, batch.size))
+    output <- c(output, trans)
+  }
+  #stack CNN output along Axis-Z
+  cnn.features <- mx.symbol.Concat(data=output, num.args = length(filter.list), dim = 1)
+  if(dropout > 0){
+    cnn.features <- mx.symbol.Dropout(cnn.features, p=dropout)
+  }
+  
+  ################
+  #   GRU RNN    #
+  ################
+  output.gru.bulk  <- rnn.unroll(data=cnn.features, num.rnn.layer=num.rnn.layer, seq.len=seq.len, num.hidden=num.filter*length(filter.list), dropout=dropout)
+  output.gru <- output.gru.bulk$outputs
+  output.gru <- rev(output.gru)
+  rnn.features = output.gru[[1]]
+  
+  ######################
+  # Temporal Attention #
+  ######################
+  attn.numerator.stack <- list()
+  for(i in 1:seq.len){
+    attn.input <- mx.symbol.concat(data = c(output.gru[[i]], rnn.features), num.args = 2, dim = 1)
+    attn.numerator <- mx.symbol.FullyConnected(data=attn.input, num_hidden=1)
+    attn.numerator <- mx.symbol.exp(attn.numerator)
+    attn.numerator.stack <- c(attn.numerator.stack, attn.numerator)
+  }
+  attn.numerator.stack <- mx.symbol.Concat(data=attn.numerator.stack, num.args = seq.len, dim = 1)
+  attn.denominator <- mx.symbol.sum(data = attn.numerator.stack, axis = 1)
+  attn.denominator <- mx.symbol.Reshape(data=attn.denominator, shape=c(1,batch.size))
+  attn.denominator.stack <- mx.symbol.broadcast_axis(data=attn.denominator, axis=1, size=seq.len)
+  attn.output <- attn.numerator.stack / attn.denominator.stack
+  
+  c.t.stack <-list()
+  attn.output.slice.broad <- list()
+  attn.output.slice <- mx.symbol.SliceChannel(data = attn.output, num_outputs = seq.len, axis = 1)
+  for(i in 1:seq.len){
+    attn.output.slice.broad[[i]] <- mx.symbol.broadcast_axis(data = attn.output.slice[[i]], axis=1, size=num.filter*length(filter.list))
+    c.t.stack[[i]]<-output.gru[[i]]*attn.output.slice.broad[[i]]
+    c.t.stack[[i]]<-mx.symbol.Reshape(data=c.t.stack[[i]], shape=c(300, 128, 1) )
+  }
+  aaa <- mx.symbol.concat(c.t.stack, num.args = seq.len, dim = 2)
+  c.t <- mx.symbol.zeros_like(rnn.features) 
+  
+  ##################
+  # Autoregression #
+  ##################
+  time.series.slice <- mx.symbol.SliceChannel(data=data, num_outputs=input.size, axis= 1, squeeze_axis=1)
+  auto.list <- list()
+  for(i in 1:input.size){
+    time.series <- time.series.slice[[i]]
+    fc.ts <- mx.symbol.FullyConnected(data=time.series, num_hidden = 1)
+    auto.list <- c(auto.list, fc.ts)
+  }
+  ar.output <- mx.symbol.Concat(data=auto.list, num.args = input.size, dim=1)
+  
+  ##################
+  # Prediction Out #  
+  ##################
+  neural.componts <- mx.symbol.Concat(data = c(c.t, rnn.features), num.args=2, dim = 1)
+  neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=input.size)
+  model.output <- neural.output + ar.output
+  loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
+  #include last states of GRU and LSTM for updating
+  
+  if(init.update){
+    gru.last.states  <- output.gru.bulk$last.states
+    
+    gru.unpack.h <- list()
+    for (i in 1:num.rnn.layer) {
+      #gru lastest state
+      gru.state <- gru.last.states[[i]]
+      gru.state  <- list(h=mx.symbol.BlockGrad(gru.state$h, name=paste0("l", i, ".gru.last.h" )))
+      gru.unpack.h <- c(gru.unpack.h, gru.state$h)
+    }
+    
+    #include everything
+    list.all <- c(loss.grad, gru.unpack.h)
     return(mx.symbol.Group(list.all))
   }else{
     return(loss.grad)
