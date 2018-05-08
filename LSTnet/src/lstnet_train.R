@@ -402,3 +402,20 @@ args$symbol <- lstnet.sym
 args$ctx <- ctx
 args$grad.req <- 'add'
 lstnet.exec <- do.call(mx.simple.bind, args)
+mx.exec.update.arg.arrays(lstnet.exec, params$arg.params, match.name = TRUE)
+mx.exec.update.aux.arrays(lstnet.exec, params$aux.params, match.name = TRUE)
+
+grad.arrays <- list()
+for (name in names(lstnet.exec$ref.grad.arrays)) {
+  if (is.param.name(name))
+    grad.arrays[[name]] <- lstnet.exec$ref.arg.arrays[[name]]*0
+}
+mx.exec.update.grad.arrays(lstnet.exec, grad.arrays, match.name=TRUE)
+model <- list(lstnet.exec=lstnet.exec, 
+              symbol=lstnet.sym,
+              num.rnn.layer=num.rnn.layer, 
+              num.filter=num.filter,
+              filter.list = filter.list,
+              seq.len=seq.len, 
+              batch.size=batch.size,
+              input.size=input.size)

@@ -410,35 +410,39 @@ mx.rnn.lstnet.attn <- function(filter.list,
   ################
   output.gru.bulk  <- rnn.unroll(data=cnn.features, num.rnn.layer=num.rnn.layer, seq.len=seq.len, num.hidden=num.filter*length(filter.list), dropout=dropout)
   output.gru <- output.gru.bulk$outputs
-  output.gru <- rev(output.gru)
-  rnn.features = output.gru[[1]]
+  rnn.features = output.gru[[seq.len]]
   
   ######################
   # Temporal Attention #
   ######################
   attn.numerator.stack <- list()
   for(i in 1:seq.len){
-    attn.input <- mx.symbol.concat(data = c(output.gru[[i]], rnn.features), num.args = 2, dim = 1)
+    if(i == seq.len){
+      attn.input <- mx.symbol.Reshape(data = rnn.features, shape=c((num.filter*length(filter.list)), batch.size, 1))
+      attn.input <- mx.symbol.broadcast_axis(data=attn.input, axis=0, size=2)
+      attn.input <- mx.symbol.Reshape(data = attn.input, shape=c(batch.size, (2*num.filter*length(filter.list))))
+      attn.input <- mx.symbol.transpose(data = attn.input, axes=c(0,1))
+    }else{
+      attn.input <- mx.symbol.Concat(data = c(output.gru[[i]], rnn.features), num.args = 2, dim = 1)
+    }
     attn.numerator <- mx.symbol.FullyConnected(data=attn.input, num_hidden=1)
     attn.numerator <- mx.symbol.exp(attn.numerator)
     attn.numerator.stack <- c(attn.numerator.stack, attn.numerator)
   }
-  attn.numerator.stack <- mx.symbol.Concat(data=attn.numerator.stack, num.args = seq.len, dim = 1)
-  attn.denominator <- mx.symbol.sum(data = attn.numerator.stack, axis = 1)
+  attn.numerators <- mx.symbol.Concat(data=attn.numerator.stack, num.args = seq.len, dim = 1)
+  attn.denominator <- mx.symbol.sum(data = attn.numerators, axis = 1)
   attn.denominator <- mx.symbol.Reshape(data=attn.denominator, shape=c(1,batch.size))
-  attn.denominator.stack <- mx.symbol.broadcast_axis(data=attn.denominator, axis=1, size=seq.len)
-  attn.output <- attn.numerator.stack / attn.denominator.stack
+  attn.alphas <- mx.symbol.broadcast_div(attn.numerators, attn.denominator)
   
-  c.t.stack <-list()
-  attn.output.slice.broad <- list()
-  attn.output.slice <- mx.symbol.SliceChannel(data = attn.output, num_outputs = seq.len, axis = 1)
+  attn.layer.stack <- list()
+  attn.alpha.slice <- mx.symbol.SliceChannel(data = attn.alphas, num_outputs = seq.len, axis = 1)
   for(i in 1:seq.len){
-    attn.output.slice.broad[[i]] <- mx.symbol.broadcast_axis(data = attn.output.slice[[i]], axis=1, size=num.filter*length(filter.list))
-    c.t.stack[[i]]<-output.gru[[i]]*attn.output.slice.broad[[i]]
-    c.t.stack[[i]]<-mx.symbol.Reshape(data=c.t.stack[[i]], shape=c(300, 128, 1) )
+    attn.layer <- mx.symbol.broadcast_mul(output.gru[[i]], attn.alpha.slice[[i]])
+    attn.layer <- mx.symbol.Reshape(data= attn.layer, shape=c(1, (num.filter*length(filter.list)), batch.size) )
+    attn.layer.stack <- c(attn.layer.stack, attn.layer)
   }
-  aaa <- mx.symbol.concat(c.t.stack, num.args = seq.len, dim = 2)
-  c.t <- mx.symbol.zeros_like(rnn.features) 
+  attn.layers <- mx.symbol.Concat(attn.layer.stack, num.args = seq.len, dim = 2)
+  attn.temp <- mx.symbol.sum_axis(data = attn.layers, axis = 2)  
   
   ##################
   # Autoregression #
@@ -455,7 +459,7 @@ mx.rnn.lstnet.attn <- function(filter.list,
   ##################
   # Prediction Out #  
   ##################
-  neural.componts <- mx.symbol.Concat(data = c(c.t, rnn.features), num.args=2, dim = 1)
+  neural.componts <- mx.symbol.Concat(data = c(attn.temp, rnn.features), num.args=2, dim = 1)
   neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=input.size)
   model.output <- neural.output + ar.output
   loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
