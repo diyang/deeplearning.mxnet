@@ -111,8 +111,10 @@ train.lstnet <- function(model,
       train.output <- as.array(m$lstnet.exec$outputs[['loss_output']])
       
       eval.batch.res <- evaluate(pred=train.output, label=as.array(train.input$label))
-      cat(paste0("Epoch [", epoch, "] Batch [", batch.counter, "] : RAE:", 
-                 eval.batch.res[['RAE']], "; RSE: ", eval.batch.res[['RSE']], "; CORR: ", eval.batch.res[['CORR']]," \n"))
+      cat(paste0("Epoch [", epoch, "] Batch [", batch.counter, "] : MSE:", eval.batch.res[['MSE']]," \n"))
+      
+      #cat(paste0("Epoch [", epoch, "] Batch [", batch.counter, "] : RAE:", 
+      #           eval.batch.res[['RAE']], "; RSE: ", eval.batch.res[['RSE']], "; CORR: ", eval.batch.res[['CORR']]," \n"))
       
       if(begin == 1){
         train.output.stack <- train.output
@@ -142,8 +144,11 @@ train.lstnet <- function(model,
     toc <- Sys.time()
     
     eval.epoch.res <- evaluate(pred=train.output.stack, label=train.data$label)
-    cat(paste0("Epoch [", epoch, "] Train: Time: ", as.numeric(toc - tic, units="secs"), " sec; RAE:", 
-               eval.epoch.res[['RAE']], "; RSE: ", eval.epoch.res[['RSE']], "; CORR: ", eval.epoch.res[['CORR']]," \n"))
+    
+    cat(paste0("Epoch [", epoch, "] Train Time: ", as.numeric(toc - tic, units="secs"), " sec; MSE:", eval.epoch.res[['MSE']]," \n"))
+    
+    #cat(paste0("Epoch [", epoch, "] Train Time: ", as.numeric(toc - tic, units="secs"), " sec; RAE:", 
+    #           eval.epoch.res[['RAE']], "; RSE: ", eval.epoch.res[['RSE']], "; CORR: ", eval.epoch.res[['CORR']]," \n"))
     
     ####################
     # batch validating #
@@ -174,7 +179,7 @@ train.lstnet <- function(model,
       }else{
         valid.output.stack <- cbind(valid.output.stack, valid.output)
       }
-      
+
       #update GRU and LSTM states 
       if(init.update){
         init.states <- list()
@@ -195,8 +200,11 @@ train.lstnet <- function(model,
     }
     
     valid.res <- evaluate(pred=valid.output.stack, label=valid.data$label)
-    cat(paste0("Epoch [", epoch, "] Validation; RAE:", valid.res[['RAE']], 
-               "; RSE: ", valid.res[['RSE']], "; CORR: ", valid.res[['CORR']]," \n"))
+    
+    cat(paste0("Epoch [", epoch, "] Validation; MSE:", valid.res[['MSE']]," \n"))
+    
+    #cat(paste0("Epoch [", epoch, "] Validation; RAE:", valid.res[['RAE']], 
+    #           "; RSE: ", valid.res[['RSE']], "; CORR: ", valid.res[['CORR']]," \n"))
     
   }
 }
@@ -336,7 +344,6 @@ mx.lstnet <- function(#input data:
                               initializer = initializer,
                               dropout = dropout)
   
-  if(FALSE){
   model <- train.lstnet(model,
                         train.data = data$train,
                         valid.data = data$valid,
@@ -345,77 +352,11 @@ mx.lstnet <- function(#input data:
                         wd = wd,
                         clip_gradient = clip_gradient,
                         init.update = init.update,
-                        optimiser = optimiser)
+                        optimiser = optimiser,
+                        type = type)
   
   # change model into MXFeedForwardModel
   model <- list(symbol=model$symbol, arg.params=model$lstnet.exec$ref.arg.arrays, aux.params=model$lstnet.exec$ref.aux.arrays)
-  }
+  
   return(structure(model, class="MXFeedForwardModel"))
 }
-
-
-
-seq.len <- 24*7
-batch.size <- 128
-num.rnn.layer <- 1
-num.filter <- 100
-filter.list <- c(6, 12, 18)
-input.size <- 321
-dropout <- 0
-init.update <- FALSE
-lstnet.sym <- mx.rnn.lstnet.attn(filter.list = filter.list,
-                                 num.filter = num.filter,
-                                 seq.len = seq.len,
-                                 input.size = input.size,
-                                 batch.size = batch.size,
-                                 num.rnn.layer = num.rnn.layer,
-                                 init.update = init.update,
-                                 dropout = dropout)
-
-init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
-  state.h <- paste0("l", i, ".gru.init.h")
-  return (state.h)
-})
-init.states.name <- c(init.gru.states.h)
-
-ctx <- mx.ctx.default() 
-initializer<-mx.init.uniform(0.01)
-
-arg.names <- lstnet.sym$arguments
-input.shape <- list()
-for (name in arg.names) {
-  if (name %in% init.states.name) {
-    input.shape[[name]] <- c(num.filter*length(filter.list), batch.size)
-  }
-  if (grepl('data$', name) ) {
-    input.shape[[name]] <- c(seq.len, input.size, batch.size)
-  }
-  else if (grepl('label$', name) ){
-    input.shape[[name]] <- c(input.size, batch.size)
-  }
-}
-
-params <- mx.model.init.params(symbol = lstnet.sym, input.shape = input.shape, initializer = initializer, ctx = ctx)
-
-args <- input.shape
-args$symbol <- lstnet.sym
-args$ctx <- ctx
-args$grad.req <- 'add'
-lstnet.exec <- do.call(mx.simple.bind, args)
-mx.exec.update.arg.arrays(lstnet.exec, params$arg.params, match.name = TRUE)
-mx.exec.update.aux.arrays(lstnet.exec, params$aux.params, match.name = TRUE)
-
-grad.arrays <- list()
-for (name in names(lstnet.exec$ref.grad.arrays)) {
-  if (is.param.name(name))
-    grad.arrays[[name]] <- lstnet.exec$ref.arg.arrays[[name]]*0
-}
-mx.exec.update.grad.arrays(lstnet.exec, grad.arrays, match.name=TRUE)
-model <- list(lstnet.exec=lstnet.exec, 
-              symbol=lstnet.sym,
-              num.rnn.layer=num.rnn.layer, 
-              num.filter=num.filter,
-              filter.list = filter.list,
-              seq.len=seq.len, 
-              batch.size=batch.size,
-              input.size=input.size)

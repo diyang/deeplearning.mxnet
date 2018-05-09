@@ -267,6 +267,7 @@ rnn.unroll <- function(data,
     # Aggeregate outputs from each timestep
     last.hidden <- c(last.hidden, hidden)
   }
+  
   list.all <- list(outputs = last.hidden, last.states = last.states)
   
   return(list.all)
@@ -415,34 +416,29 @@ mx.rnn.lstnet.attn <- function(filter.list,
   ######################
   # Temporal Attention #
   ######################
+  
   attn.numerator.stack <- list()
-  for(i in 1:seq.len){
-    if(i == seq.len){
-      attn.input <- mx.symbol.Reshape(data = rnn.features, shape=c((num.filter*length(filter.list)), batch.size, 1))
-      attn.input <- mx.symbol.broadcast_axis(data=attn.input, axis=0, size=2)
-      attn.input <- mx.symbol.Reshape(data = attn.input, shape=c(batch.size, (2*num.filter*length(filter.list))))
-      attn.input <- mx.symbol.transpose(data = attn.input, axes=c(0,1))
-    }else{
-      attn.input <- mx.symbol.Concat(data = c(output.gru[[i]], rnn.features), num.args = 2, dim = 1)
-    }
+  for(i in 1:(seq.len-1)){
+    attn.input <- mx.symbol.Concat(data=c(output.gru[[i]], rnn.features), num.args = 2, dim = 1)
     attn.numerator <- mx.symbol.FullyConnected(data=attn.input, num_hidden=1)
+    attn.numerator <- mx.symbol.Activation(data = attn.numerator, act_type = 'sigmoid')
     attn.numerator <- mx.symbol.exp(attn.numerator)
     attn.numerator.stack <- c(attn.numerator.stack, attn.numerator)
   }
-  attn.numerators <- mx.symbol.Concat(data=attn.numerator.stack, num.args = seq.len, dim = 1)
+  attn.numerators <- mx.symbol.Concat(data=attn.numerator.stack, num.args = seq.len-1, dim = 1)
   attn.denominator <- mx.symbol.sum(data = attn.numerators, axis = 1)
-  attn.denominator <- mx.symbol.Reshape(data=attn.denominator, shape=c(1,batch.size))
+  attn.denominator <- mx.symbol.Reshape(data = attn.denominator, shape=c(1,batch.size))
   attn.alphas <- mx.symbol.broadcast_div(attn.numerators, attn.denominator)
-  
-  attn.layer.stack <- list()
-  attn.alpha.slice <- mx.symbol.SliceChannel(data = attn.alphas, num_outputs = seq.len, axis = 1)
-  for(i in 1:seq.len){
-    attn.layer <- mx.symbol.broadcast_mul(output.gru[[i]], attn.alpha.slice[[i]])
-    attn.layer <- mx.symbol.Reshape(data= attn.layer, shape=c(1, (num.filter*length(filter.list)), batch.size) )
+ 
+  attn.layer.stack <-list()
+  attn.alpha <- mx.symbol.SliceChannel(data = attn.alphas, num_outputs = seq.len-1, axis = 1)
+  for(i in 1:(seq.len-1)){
+    attn.layer<- mx.symbol.broadcast_mul(output.gru[[i]], attn.alpha[[i]])
+    attn.layer<-mx.symbol.Reshape(data=attn.layer, shape=c(1, (num.filter*length(filter.list)), batch.size) )
     attn.layer.stack <- c(attn.layer.stack, attn.layer)
   }
-  attn.layers <- mx.symbol.Concat(attn.layer.stack, num.args = seq.len, dim = 2)
-  attn.temp <- mx.symbol.sum_axis(data = attn.layers, axis = 2)  
+  attn.layers <- mx.symbol.Concat(attn.layer.stack, num.args = seq.len-1, dim = 2)
+  attn.temporal <- mx.symbol.sum(attn.layers, axis = 2)
   
   ##################
   # Autoregression #
@@ -459,12 +455,16 @@ mx.rnn.lstnet.attn <- function(filter.list,
   ##################
   # Prediction Out #  
   ##################
-  neural.componts <- mx.symbol.Concat(data = c(attn.temp, rnn.features), num.args=2, dim = 1)
+  neural.componts <- mx.symbol.Concat(data = c(attn.temporal, rnn.features), num.args=2, dim = 1)
   neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=input.size)
   model.output <- neural.output + ar.output
   loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
-  #include last states of GRU and LSTM for updating
   
+  attn.grad <- mx.symbol.BlockGrad(data = attn.alphas, name='attn')  
+  
+  list.all <- c(loss.grad, attn.grad)
+  
+  #include last states of GRU and LSTM for updating
   if(init.update){
     gru.last.states  <- output.gru.bulk$last.states
     
@@ -480,6 +480,6 @@ mx.rnn.lstnet.attn <- function(filter.list,
     list.all <- c(loss.grad, gru.unpack.h)
     return(mx.symbol.Group(list.all))
   }else{
-    return(loss.grad)
+    return(mx.symbol.Group(list.all))
   }
 }

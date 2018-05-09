@@ -18,8 +18,8 @@
 # under the License.
 
 require(mxnet)
-#setwd("I:/Desktop/R/LSTnet/src/")
-setwd('~/Documents/deeplearning.mxnet/LSTnet/src/')
+setwd("I:/Desktop/R/LSTnet/src/")
+#setwd('~/Documents/deeplearning.mxnet/LSTnet/src/')
 source("./lstnet_train.R")
 
 data.preparation <- function(data, 
@@ -92,20 +92,22 @@ data.preparation <- function(data,
 
 
 seq.len <- 24*7
-horizon <- 3
+horizon <- 1
 max.records <- 24*7*10
 splits <- c(0.6,0.2)
 batch.size<-128
 seasonal.period <- 24
 time.interval <- 1
 filter.list <- c(6, 12, 18)
-num.filter <- 100
-dropout <-0.2
+num.filter <- 20
+dropout <-0.0
 num.rnn.layer <- 1
 learning.rate <- 0.01
-wd <- 0.0
-clip_gradient<-FALSE
+wd <- 0.005
+clip_gradient<-10
 init.update <- FALSE
+ctx <- mx.cpu()
+initializer <- mx.init.uniform(0.01)
 optimiser <- 'sgd'
 
 data <- read.csv('../data/electricity.txt', header=FALSE, sep=",")
@@ -117,7 +119,9 @@ iter.data <- data.preparation(data,
                               batch_size = batch.size,
                               max.records = max.records)
 
-lstnet.sym <- mx.lstnet(data = iter.data,
+
+
+lstnet.model <- mx.lstnet(data = iter.data,
                         seq.len = seq.len,
                         batch.size = batch.size,
                         ctx = mx.ctx.default(),
