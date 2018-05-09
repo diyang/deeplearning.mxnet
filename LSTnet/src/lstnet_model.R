@@ -280,8 +280,6 @@ mx.rnn.lstnet.skip <- function(seasonal.period,
                                seq.len,
                                input.size,
                                batch.size,
-                               num.rnn.layer = 1,
-                               init.update = FALSE,
                                dropout = 0)
 {
   data <- mx.symbol.Variable('data')
@@ -380,7 +378,6 @@ mx.rnn.lstnet.attn <- function(filter.list,
                                input.size,
                                batch.size,
                                num.rnn.layer = 1,
-                               init.update = FALSE,
                                dropout = 0)
 {
   data <- mx.symbol.Variable('data')
@@ -459,27 +456,5 @@ mx.rnn.lstnet.attn <- function(filter.list,
   neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=input.size)
   model.output <- neural.output + ar.output
   loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
-  
-  attn.grad <- mx.symbol.BlockGrad(data = attn.alphas, name='attn')  
-  
-  list.all <- c(loss.grad, attn.grad)
-  
-  #include last states of GRU and LSTM for updating
-  if(init.update){
-    gru.last.states  <- output.gru.bulk$last.states
-    
-    gru.unpack.h <- list()
-    for (i in 1:num.rnn.layer) {
-      #gru lastest state
-      gru.state <- gru.last.states[[i]]
-      gru.state  <- list(h=mx.symbol.BlockGrad(gru.state$h, name=paste0("l", i, ".gru.last.h" )))
-      gru.unpack.h <- c(gru.unpack.h, gru.state$h)
-    }
-    
-    #include everything
-    list.all <- c(loss.grad, gru.unpack.h)
-    return(mx.symbol.Group(list.all))
-  }else{
-    return(mx.symbol.Group(list.all))
-  }
+  return(loss.grad)
 }

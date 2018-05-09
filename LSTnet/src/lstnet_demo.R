@@ -18,8 +18,8 @@
 # under the License.
 
 require(mxnet)
-setwd("I:/Desktop/R/LSTnet/src/")
-#setwd('~/Documents/deeplearning.mxnet/LSTnet/src/')
+#setwd("I:/Desktop/R/LSTnet/src/")
+setwd('~/Documents/deeplearning.mxnet/LSTnet/src/')
 source("./lstnet_train.R")
 
 data.preparation <- function(data, 
@@ -136,6 +136,18 @@ lstnet.model <- mx.lstnet(data = iter.data,
                         clip_graident = clip_graident,
                         optimizer = optimiser,
                         dropout = dropout,
-                        init.update = init.update,
                         num.rnn.layer = num.rnn.layer,
                         type='attn')
+
+
+train.data <- check.data(iter.data$train, batch.size, TRUE)
+valid.data <- check.data(iter.data$valid, batch.size, FALSE)
+epoch <- 1
+model <- lstnet.model
+init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
+  state.h <- paste0("l", i, ".gru.init.h")
+  return (state.h)
+})
+init.states.name <- c(init.gru.states.h)
+
+#mx.viz.plot_network(lstnet.model$lstnet.sym)
