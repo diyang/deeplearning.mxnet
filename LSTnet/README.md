@@ -12,7 +12,7 @@ Download & extract the training data:
 - `$ gunzip electricity.txt.gz`
 
 ## Results & Comparison
-
+- Please run src/lstnet_demo.R
 - The model in the paper predicts with h = 3 on electricity dataset, achieving *RSE = 0.0906, RAE = 0.0519 and CORR = 0.9195* on test dataset
 - This MXNet implementation achieves *RSE = 0.0880, RAE = 0.0542* after 100 epochs on the validation dataset
 
