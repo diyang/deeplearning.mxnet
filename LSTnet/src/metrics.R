@@ -19,6 +19,8 @@
 
 require(mxnet)
 
+specify_decimal <- function(x, k) trimws(format(round(x, k), nsmall=k))
+
 rse <- function(label, pred)
 {
   label.vec <- mx.nd.reshape(label, shape=c(1,-1))
@@ -63,22 +65,49 @@ corr <- function(label, pred)
   return(as.array(corr))
 }
 
-mse <- function(label, pred)
+rmse <- function(label, pred)
 {
-  mse <- mx.nd.mean(mx.nd.square(label - pred))
-  return(as.array(mse))
+  rmse <- mx.nd.sqrt(mx.nd.mean(mx.nd.square(label - pred)))
+  return(as.array(rmse))
 }
 
-evaluate <- function(pred, label)
-{
-  pred <- mx.nd.array(pred)
-  label <- mx.nd.array(label)
 
-  eva.all <-list()
-  eva.all[['RAE']]  <- rae(label = label, pred = pred)
-  eva.all[['RSE']]  <- rse(label = label, pred = pred)
-  eva.all[['CORR']] <- corr(label = label, pred = pred)
-  eva.all[['MSE']] <- mse(label = label, pred = pred)
-  return(eva.all)
+mx.lstnet.evaluation <- function(){
+  init <- function(){
+    state <- list()
+    state[['RAE']] <- 0
+    state[['RSE']] <- 0
+    state[['CORR']] <- 0
+    state[['RMSE']] <- 0
+    state[['batch']] <- 0
+    return(state)
+  }
+  
+  update <- function(pred, label, state)
+  {
+    if(!is.mx.ndarray(pred)){
+      pred <- mx.nd.array(pred)
+    }
+    if(!is.mx.ndarray(label)){
+      label <- mx.nd.array(label)
+    }
+    
+    state[['RAE']]  <- state[['RAE']] + rae(label = label, pred = pred)
+    state[['RSE']]  <- state[['RSE']] + rse(label = label, pred = pred)
+    state[['CORR']] <- state[['CORR']] +corr(label = label, pred = pred)
+    state[['RMSE']]  <-state[['RMSE']] + rmse(label = label, pred = pred)
+    state[['batch']] <- state[['batch']] + 1
+    return(state)
+  }
+  
+  get <- function(state){
+    res <-list()
+    res[['RAE']] <- specify_decimal(state[['RAE']]/state[['batch']], 6)
+    res[['RSE']] <- specify_decimal(state[['RSE']]/state[['batch']], 6)
+    res[['CORR']]<- specify_decimal(state[['CORR']]/state[['batch']], 6)
+    res[['RMSE']]<- specify_decimal(state[['RMSE']]/state[['batch']], 6)
+    return(res)
+  }
+  ret <- list(init=init, update=update, get=get)
+  return(ret)
 }
-

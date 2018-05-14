@@ -36,6 +36,20 @@ data.preparation <- function(data,
     x.shape[1] <- max.records
   }
   
+  #normalisation process
+  x.norm <- mx.nd.array(x)
+  x.norm.max <- mx.nd.max(x.norm, axis = 1)
+  x.norm.max <- mx.nd.Reshape(x.norm.max, shape=c(1,-1))
+  x.norm.min <- mx.nd.min(x.norm, axis = 1)
+  x.norm.min <- mx.nd.Reshape(x.norm.min, shape=c(1,-1))
+  
+  x.numerator <- mx.nd.broadcast.minus(x.norm, x.norm.min)
+  x.denominator <- x.norm.max - x.norm.min
+  x.norm <- mx.nd.broadcast.div(x.numerator, x.denominator)
+  x.norm <- (x.norm - 0.5)*2
+  
+  x <- as.array(x.norm)
+  
   # initialise data tensor container
   x_ts <- array(rep(0,(x.shape[1]-seq.len)*seq.len*x.shape[2]), dim=c(x.shape[1]-seq.len, seq.len, x.shape[2]))
   y_ts <- array(rep(0,(x.shape[1]-seq.len)*x.shape[2]), dim=c(x.shape[1]-seq.len, x.shape[2]))
@@ -92,23 +106,23 @@ data.preparation <- function(data,
 
 
 seq.len <- 24*7
-horizon <- 1
+horizon <- 3
 max.records <- 24*7*10
 splits <- c(0.6,0.2)
 batch.size<-128
 seasonal.period <- 24
 time.interval <- 1
 filter.list <- c(6, 12, 18)
-num.filter <- 20
-dropout <-0.0
+num.filter <- 100
+dropout <-0.2
 num.rnn.layer <- 1
-learning.rate <- 0.01
+learning.rate <- 0.5
+lr_scheduler <- mx.lr_scheduler.FactorScheduler(step = 50, factor=0.5, stop_factor_lr = 0.01)
 wd <- 0.005
 clip_gradient<-10
-init.update <- FALSE
 ctx <- mx.cpu()
 initializer <- mx.init.uniform(0.01)
-optimiser <- 'sgd'
+optimizer <- 'sgd'
 
 data <- read.csv('../data/electricity.txt', header=FALSE, sep=",")
 
@@ -118,8 +132,6 @@ iter.data <- data.preparation(data,
                               splits = splits, 
                               batch_size = batch.size,
                               max.records = max.records)
-
-
 
 lstnet.model <- mx.lstnet(data = iter.data,
                         seq.len = seq.len,
@@ -134,20 +146,8 @@ lstnet.model <- mx.lstnet(data = iter.data,
                         learning.rate = learning.rate,
                         wd=wd,
                         clip_graident = clip_graident,
-                        optimizer = optimiser,
+                        optimizer = optimizer,
                         dropout = dropout,
                         num.rnn.layer = num.rnn.layer,
-                        type='attn')
-
-
-train.data <- check.data(iter.data$train, batch.size, TRUE)
-valid.data <- check.data(iter.data$valid, batch.size, FALSE)
-epoch <- 1
-model <- lstnet.model
-init.gru.states.h <- lapply(1:num.rnn.layer, function(i) {
-  state.h <- paste0("l", i, ".gru.init.h")
-  return (state.h)
-})
-init.states.name <- c(init.gru.states.h)
-
-#mx.viz.plot_network(lstnet.model$lstnet.sym)
+                        lr_scheduler = lr_scheduler,
+                        type='skip')
