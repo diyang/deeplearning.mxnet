@@ -25,7 +25,8 @@
 
 require(MASS)
 require(plotrix)
-source('./svdd_smo.R')
+setwd('~/Documents/deeplearning.mxnet/SVDD/src/')
+source('./svdd_dual.R')
 
 #making some dummy data
 mu <- rep(0,2)
