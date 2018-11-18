@@ -27,7 +27,14 @@ lstnet.input <- function(data, batch.begin, batch.size)
 {
   data.batch <- list()
   data.batch[["data"]] <- mx.nd.array(data$data[,,batch.begin:(batch.begin+batch.size-1)])
-  data.batch[["label"]] <- mx.nd.array(data$label[,batch.begin:(batch.begin+batch.size-1)])
+  if(length(dim(data$label))==1){
+    label.mat <- matrix(data$label[batch.begin:(batch.begin+batch.size-1)])
+    label.mat <- mx.nd.array(label.mat)
+    label.mat <- mx.nd.reshape(label.mat, shape = c(1, batch.size))
+    data.batch[["label"]] <- label.mat
+  }else{
+    data.batch[["label"]] <- mx.nd.array(data$label[,batch.begin:(batch.begin+batch.size-1)])
+  }
   return(data.batch)
 }
 
@@ -239,6 +246,7 @@ lstnet.setup.model <- function(lstnet.sym,
                                seq.len,
                                batch.size,
                                input.size,
+                               output.size,
                                init.states.name,
                                initializer=mx.init.uniform(0.01),
                                type = 'skip',
@@ -254,7 +262,7 @@ lstnet.setup.model <- function(lstnet.sym,
       input.shape[[name]] <- c(seq.len, input.size, batch.size)
     }
     else if (grepl('label$', name) ){
-      input.shape[[name]] <- c(input.size, batch.size)
+      input.shape[[name]] <- c(output.size, batch.size)
     }
   }
   
@@ -304,6 +312,7 @@ mx.lstnet <- function(#input data:
                       dropout = 0,
                       #training params:
                       num.epoch,
+                      output.size = NULL,
                       learning.rate = 0.1,
                       wd,
                       clip_graident = NULL,
@@ -313,9 +322,17 @@ mx.lstnet <- function(#input data:
                       )
 {
   train.data <- check.data(data$train, batch.size, TRUE)
-  valid.data <- check.data(data$valid, batch.size, FALSE)
+  if(!is.null(data$valid)){
+    valid.data <- check.data(data$valid, batch.size, FALSE)
+  }else{
+    valid.data <- NULL
+  }
   
   input.size <- dim(data$train$data)[2]
+  if(is.null(output.size)){
+    output.size <- input.size
+  }
+  
   if(type == 'skip'){
     lstnet.sym <- mx.rnn.lstnet.skip(seasonal.period = seasonal.period,
                                      time.interval = time.interval,
@@ -323,6 +340,7 @@ mx.lstnet <- function(#input data:
                                      num.filter = num.filter,
                                      seq.len = seq.len,
                                      input.size = input.size,
+                                     output.size = output.size,
                                      batch.size = batch.size,
                                      num.rnn.layer = num.rnn.layer,
                                      dropout = dropout)
@@ -345,6 +363,7 @@ mx.lstnet <- function(#input data:
                                      num.filter = num.filter,
                                      seq.len = seq.len,
                                      input.size = input.size,
+                                     output.size = output.size,
                                      batch.size = batch.size,
                                      num.rnn.layer = num.rnn.layer,
                                      dropout = dropout)
@@ -364,6 +383,7 @@ mx.lstnet <- function(#input data:
                               seq.len = seq.len,
                               batch.size = batch.size,
                               input.size = input.size,
+                              output.size = output.size,
                               init.states.name = init.states.name,
                               initializer = initializer,
                               type = type,

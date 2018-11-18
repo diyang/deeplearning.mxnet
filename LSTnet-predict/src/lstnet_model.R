@@ -280,6 +280,7 @@ mx.rnn.lstnet.skip <- function(seasonal.period,
                                seq.len,
                                num.rnn.layer,
                                input.size,
+                               output.size,
                                batch.size,
                                dropout = 0)
 {
@@ -328,18 +329,18 @@ mx.rnn.lstnet.skip <- function(seasonal.period,
   ##################
   time.series.slice <- mx.symbol.SliceChannel(data=data, num_outputs=input.size, axis= 1, squeeze_axis=1)
   auto.list <- list()
-  for(i in 1:input.size){
+  for(i in 1:output.size){
     time.series <- time.series.slice[[i]]
     fc.ts <- mx.symbol.FullyConnected(data=time.series, num_hidden = 1)
     auto.list <- c(auto.list, fc.ts)
   }
-  ar.output <- mx.symbol.Concat(data=auto.list, num.args = input.size, dim=1)
+  ar.output <- mx.symbol.Concat(data=auto.list, num.args = output.size, dim=1)
   
   ##################
   # Prediction Out #  
   ##################
   neural.componts <- mx.symbol.Concat(data = c(rnn.features, skip.rnn.features), num.args=2, dim = 1)
-  neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=input.size)
+  neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=output.size)
   model.output <- neural.output + ar.output
   loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
   
@@ -376,6 +377,7 @@ mx.rnn.lstnet.attn <- function(filter.list,
                                num.filter,
                                seq.len,
                                input.size,
+                               output.size,
                                batch.size,
                                num.rnn.layer = 1,
                                dropout = 0)
@@ -442,18 +444,18 @@ mx.rnn.lstnet.attn <- function(filter.list,
   ##################
   time.series.slice <- mx.symbol.SliceChannel(data=data, num_outputs=input.size, axis= 1, squeeze_axis=1)
   auto.list <- list()
-  for(i in 1:input.size){
+  for(i in 1:output.size){
     time.series <- time.series.slice[[i]]
     fc.ts <- mx.symbol.FullyConnected(data=time.series, num_hidden = 1)
     auto.list <- c(auto.list, fc.ts)
   }
-  ar.output <- mx.symbol.Concat(data=auto.list, num.args = input.size, dim=1)
+  ar.output <- mx.symbol.Concat(data=auto.list, num.args = output.size, dim=1)
   
   ##################
   # Prediction Out #  
   ##################
   neural.componts <- mx.symbol.Concat(data = c(attn.temporal, rnn.features), num.args=2, dim = 1)
-  neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=input.size)
+  neural.output <- mx.symbol.FullyConnected(data=neural.componts, num_hidden=output.size)
   model.output<-neural.output+ar.output
   loss.grad <- mx.symbol.LinearRegressionOutput(data=model.output, label=label, name='loss')
   

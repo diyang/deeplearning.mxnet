@@ -88,6 +88,7 @@ mx.lstnet.evaluation <- function(){
     if(!is.mx.ndarray(pred)){
       pred <- mx.nd.array(pred)
     }
+    
     if(!is.mx.ndarray(label)){
       label <- mx.nd.array(label)
     }

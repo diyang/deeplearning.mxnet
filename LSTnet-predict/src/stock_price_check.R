@@ -1,0 +1,18 @@
+require(quantmod)
+#getSymbols(c('YANK.AX', 'AUDS.AX', 'ZCNH.AX', 'EEU.AX', 'POU.AX', 'QAU.AX'))
+#getSymbols(c('IHEB.AX', 'GGUS.AX', 'SPY.AX'))
+getSymbols(c('CETF.AX', 'IZZ.AX'))
+#getSymbols(c('NDQ.AX', 'HACK.AX', 'BNKS.AX', 'DRUG.AX', 'FUEL.AX'))
+
+
+chartSeries(IZZ.AX, subset = 'last 3 months')
+addBBands(n=20, sd=2, ma='SMA', draw='bands', on=-1)
+#AXJO <- na.omit(AXJO)
+#AXJO.Cl <- Cl(AXJO)
+#AXJO.Cl.year <- last(AXJO.Cl, "10 years")
+#AXJO.BB.year <- BBands(AXJO.Cl.year)
+#AXJO.MACD.year <- MACD(AXJO.Cl.year)
+#AXJO.year <- merge(AXJO.Cl.year, AXJO.BB.year$dn, AXJO.BB.year$mavg, AXJO.BB.year$up, AXJO.MACD.year)
+#AXJO.9year <- last(AXJO.year, "6 years")
+#chartSeries(AXJO.Cl.year.norm, subset = 'last 3 years')
+#addBBands(n=20, sd=2, ma='SMA', draw='bands', on=-1)
